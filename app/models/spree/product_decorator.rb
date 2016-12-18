@@ -15,7 +15,7 @@ module Spree
       __elasticsearch__.delete_document if self.published?
     end
 
-    index_name Spree::ElasticsearchSettings.index
+    index_name "spree-#{Rails.env}"
     document_type 'spree_product'
 
     mapping _all: { analyzer: 'nGram_analyzer', search_analyzer: 'whitespace_analyzer' } do
