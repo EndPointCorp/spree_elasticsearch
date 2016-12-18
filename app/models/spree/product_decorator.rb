@@ -1,6 +1,19 @@
 module Spree
   Product.class_eval do
     include Elasticsearch::Model
+    include Elasticsearch::Model::Callbacks
+
+    after_commit on: [:create] do
+      __elasticsearch__.index_document if self.published?
+    end
+
+    after_commit on: [:update] do
+      __elasticsearch__.update_document if self.published?
+    end
+
+    after_commit on: [:destroy] do
+      __elasticsearch__.delete_document if self.published?
+    end
 
     index_name Spree::ElasticsearchSettings.index
     document_type 'spree_product'
@@ -145,6 +158,8 @@ module Spree
         result
       end
     end
+
+
 
     private
 
