@@ -1,21 +1,13 @@
 module Spree
   Product.class_eval do
+
     include Elasticsearch::Model
     include Elasticsearch::Model::Callbacks
 
-    after_commit on: [:create] do
-      __elasticsearch__.index_document if self.published?
-    end
+    after_save    { logger.debug ["Updating document... ", __elasticsearch__.index_document ].join }
+    after_destroy { logger.debug ["Deleting document... ", __elasticsearch__.delete_document].join }
 
-    after_commit on: [:update] do
-      __elasticsearch__.update_document if self.published?
-    end
-
-    after_commit on: [:destroy] do
-      __elasticsearch__.delete_document if self.published?
-    end
-
-    index_name "spree-#{Rails.env}"
+    index_name "spree_#{Rails.env}"
     document_type 'spree_product'
 
     mapping _all: { analyzer: 'nGram_analyzer', search_analyzer: 'whitespace_analyzer' } do
