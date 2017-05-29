@@ -4,6 +4,8 @@ module Spree
     include Elasticsearch::Model
     include Elasticsearch::Model::Callbacks
 
+    Elasticsearch::Client.new host: ENV['ELASTICSEARCH_URL']
+
     after_save    { logger.debug ["Updating document... ", __elasticsearch__.index_document ].join }
     after_destroy { logger.debug ["Deleting document... ", __elasticsearch__.delete_document].join }
 
@@ -128,19 +130,19 @@ module Spree
         # basic skeleton
         result = {
           min_score: 0.1,
-          query: { filtered: {} },
+          query: { bool: {} },
           sort: sorting,
           from: from,
           aggregations: aggregations
         }
 
         # add query and filters to filtered
-        result[:query][:filtered][:query] = query
+        result[:query][:bool][:query] = query
         # taxon and property filters have an effect on the facets
         and_filter << { terms: { taxon_ids: taxons } } unless taxons.empty?
         # only return products that are available
         and_filter << { range: { available_on: { lte: 'now' } } }
-        result[:query][:filtered][:filter] = { and: and_filter } unless and_filter.empty?
+        result[:query][:bool][:filter] = { and: and_filter } unless and_filter.empty?
 
         # add price filter outside the query because it should have no effect on facets
         if price_min && price_max && (price_min < price_max)
