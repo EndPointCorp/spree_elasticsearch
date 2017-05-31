@@ -12,23 +12,55 @@ module Spree
     index_name "spree_#{Rails.env}"
     document_type 'spree_product'
 
-    mapping _all: { analyzer: 'nGram_analyzer', search_analyzer: 'whitespace_analyzer' } do
-      indexes :name, type: 'multi_field' do
-        indexes :name, type: 'string', analyzer: 'nGram_analyzer', boost: 100
-        indexes :untouched, type: 'string', include_in_all: false, index: 'not_analyzed'
-      end
 
-      indexes :description, analyzer: 'snowball'
-      indexes :available_on, type: 'date', format: 'dateOptionalTime', include_in_all: false
-      indexes :price, type: 'double'
-      indexes :sku, type: 'string', index: 'not_analyzed'
-      indexes :taxon_ids, type: 'string', index: 'not_analyzed'
-      indexes :properties, type: 'string', index: 'not_analyzed'
+    settings index: {
+      number_of_shards: 1,
+      number_of_replicas: 3,
+      analysis: {
+        analyzer: {
+          ik_pinyin_analyzer: {
+            type: 'custom',
+            tokenizer: 'ik_smart',
+            filter: %w[pinyin_filter word_delimiter]
+          }
+        },
+        filter: {
+          pinyin_filter: {
+            type: 'pinyin',
+            first_letter: 'prefix',
+            padding_char: ' '
+          }
+        }
+      }
+
+    } do
+      mapping do
+        indexes :name, type: 'keyword', boost: 100, fields: {
+          pinyin: {
+            type: 'text',
+            store: 'no',
+            term_vector: 'with_positions_offsets',
+            analyzer: 'ik_pinyin_analyzer',
+            boost: 10
+          }
+        }
+
+        indexes :description, analyzer: 'snowball'
+        indexes :available_on, type: 'date', format: 'dateOptionalTime', include_in_all: false
+        indexes :price, type: 'double'
+        indexes :origin_price, type: 'double'
+        indexes :sku, type: 'keyword', index: 'not_analyzed'
+        indexes :taxon_ids, type: 'keyword', index: 'not_analyzed'
+        indexes :taxon_names, type: 'keyword', index: 'not_analyzed'
+        indexes :properties, type: 'keyword', index: 'not_analyzed'
+      end
     end
+
+
 
     def as_indexed_json(options={})
       result = as_json({
-        methods: [:price, :sku],
+        methods: [:price, :origin_price, :sku],
         only: [:available_on, :description, :name],
         include: {
           variants: {
@@ -43,6 +75,7 @@ module Spree
       })
       result[:properties] = property_list unless property_list.empty?
       result[:taxon_ids] = taxons.map(&:self_and_ancestors).flatten.uniq.map(&:id) unless taxons.empty?
+      result[:taxon_names] = taxons.map(&:self_and_ancestors).flatten.uniq.map(&:name) unless taxons.empty?
       result
     end
 
@@ -87,10 +120,37 @@ module Spree
       #   from: ,
       #   aggregations:
       # }
+
+
+
+      # query = {
+      #     query: {
+      #         bool: {
+      #             must: [
+      #                 { match_phrase: { 'name.pinyin': q } },
+      #             ],
+      #             filter: [
+      #                 { range: { available_on: { lte: 'now' } } },
+      #                 { range: { price: { gte: 2, lte: 10 } } }
+      #             ]
+      #         }
+      #     }
+      # }
       def to_hash
-        q = { match_all: {} }
+        q = { bool: {} }
         unless query.blank? # nil or empty
-          q = { query_string: { query: query, fields: ['name^5','description','sku'], default_operator: 'AND', use_dis_max: true } }
+          # q = { query_string: { query: query, fields: ['name^5','description','sku'], default_operator: 'AND', use_dis_max: true } }
+          q = {
+            bool: {
+              must: [
+                  { match_phrase: { 'name.pinyin': query } },
+              ],
+              filter: [
+                  { range: { available_on: { lte: 'now' } } },
+                  { range: { price: { gte: 2, lte: 10 } } }
+              ]
+            }
+          }
         end
         query = q
 
@@ -107,17 +167,17 @@ module Spree
 
         sorting = case @sorting
         when 'name_asc'
-          [ { 'name.untouched' => { order: 'asc' } }, { price: { order: 'asc' } }, '_score' ]
+          [ { 'name.pinyin' => { order: 'asc' } }, { price: { order: 'asc' } }, '_score' ]
         when 'name_desc'
-          [ { 'name.untouched' => { order: 'desc' } }, { price: { order: 'asc' } }, '_score' ]
+          [ { 'name.pinyin' => { order: 'desc' } }, { price: { order: 'asc' } }, '_score' ]
         when 'price_asc'
-          [ { 'price' => { order: 'asc' } }, { 'name.untouched' => { order: 'asc' } }, '_score' ]
+          [ { 'price' => { order: 'asc' } }, { 'name.pinyin' => { order: 'asc' } }, '_score' ]
         when 'price_desc'
-          [ { 'price' => { order: 'desc' } }, { 'name.untouched' => { order: 'asc' } }, '_score' ]
+          [ { 'price' => { order: 'desc' } }, { 'name.pinyin' => { order: 'asc' } }, '_score' ]
         when 'score'
-          [ '_score', { 'name.untouched' => { order: 'asc' } }, { price: { order: 'asc' } } ]
+          [ '_score', { 'name.pinyin' => { order: 'asc' } }, { price: { order: 'asc' } } ]
         else
-          [ { 'name.untouched' => { order: 'asc' } }, { price: { order: 'asc' } }, '_score' ]
+          [ { 'name.pinyin' => { order: 'asc' } }, { price: { order: 'asc' } }, '_score' ]
         end
 
         # aggregations
@@ -130,23 +190,23 @@ module Spree
         # basic skeleton
         result = {
           min_score: 0.1,
-          query: { bool: {} },
+          query: { filter: {} },
           sort: sorting,
-          from: from,
-          aggregations: aggregations
+          # from: from,
+          # aggregations: aggregations
         }
 
-        # add query and filters to filtered
-        result[:query][:bool][:query] = query
-        # taxon and property filters have an effect on the facets
-        and_filter << { terms: { taxon_ids: taxons } } unless taxons.empty?
-        # only return products that are available
+        # # add query and filters to filtered
+        result[:query] = query
+        # # taxon and property filters have an effect on the facets
+        # and_filter << { terms: { taxon_ids: taxons } } unless taxons.empty?
+        # # only return products that are available
         and_filter << { range: { available_on: { lte: 'now' } } }
         result[:query][:bool][:filter] = { and: and_filter } unless and_filter.empty?
-
-        # add price filter outside the query because it should have no effect on facets
+        #
+        # # add price filter outside the query because it should have no effect on facets
         if price_min && price_max && (price_min < price_max)
-          result[:filter] = { range: { price: { gte: price_min, lte: price_max } } }
+          result[:query][:bool][:filter] = { range: { price: { gte: price_min, lte: price_max } } }
         end
 
         result

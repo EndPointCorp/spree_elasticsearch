@@ -18,11 +18,11 @@ defaults: &defaults
 
 development:
   <<: *defaults
-  index: development
+  index: spree_development
 
 test:
   <<: *defaults
-  index: test
+  index: spree_test
 
 production:
   <<: *defaults

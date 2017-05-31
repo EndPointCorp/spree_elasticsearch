@@ -23,20 +23,17 @@ module Spree
             number_of_replicas: 0,
             analysis: {
               analyzer: {
-                nGram_analyzer: {
+                ik_pinyin_analyzer: {
                   type: 'custom',
-                  filter: %w(lowercase asciifolding nGram_filter),
-                  tokenizer: 'whitespace' },
-                whitespace_analyzer: {
-                  type: 'custom',
-                  filter: %w(lowercase asciifolding),
-                  tokenizer: 'whitespace' }},
+                  tokenizer: 'ik_smart',
+                  filter: %w[pinyin_filter word_delimiter]
+                }
+              },
               filter: {
-                nGram_filter: {
-                  max_gram: '20',
-                  min_gram: '3',
-                  type: 'nGram',
-                  token_chars: %w(letter digit punctuation symbol)
+                pinyin_filter: {
+                  type: 'pinyin',
+                  first_letter: 'prefix',
+                  padding_char: ' '
                 }
               }
             }
