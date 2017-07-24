@@ -4,13 +4,12 @@ module Spree
     after_destroy :elasticsearch_delete
 
     private
-
       def elasticsearch_index
-        self.__elasticsearch__.index_document
+        Indexer.perform_async(:index,  self.id)
       end
 
       def elasticsearch_delete
-        self.__elasticsearch__.delete_document
+        Indexer.perform_async(:delete,  self.id)
       end
   end
 end

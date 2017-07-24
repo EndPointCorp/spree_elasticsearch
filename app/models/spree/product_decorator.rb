@@ -6,8 +6,11 @@ module Spree
 
     Elasticsearch::Client.new host: ENV['ELASTICSEARCH_URL']
 
-    after_save    { logger.debug ["Updating document... ", __elasticsearch__.index_document ].join }
-    after_destroy { logger.debug ["Deleting document... ", __elasticsearch__.delete_document].join }
+    # after_save    { logger.debug ["Updating document... ", __elasticsearch__.index_document ].join }
+    # after_destroy { logger.debug ["Deleting document... ", __elasticsearch__.delete_document].join }
+
+    #after_save    { Indexer.perform_async(:index,  self.id) }
+    #after_destroy { Indexer.perform_async(:delete, self.id) }
 
     index_name "spree_#{Rails.env}"
     document_type 'spree_product'
@@ -53,6 +56,7 @@ module Spree
         indexes :taxon_ids, type: 'keyword', index: 'not_analyzed'
         indexes :taxon_names, type: 'keyword', index: 'not_analyzed'
         indexes :properties, type: 'keyword', index: 'not_analyzed'
+        indexes :stock, type: 'integer', index: 'not_analyzed'
       end
     end
 
@@ -76,6 +80,7 @@ module Spree
       result[:properties] = property_list unless property_list.empty?
       result[:taxon_ids] = taxons.map(&:self_and_ancestors).flatten.uniq.map(&:id) unless taxons.empty?
       result[:taxon_names] = taxons.map(&:self_and_ancestors).flatten.uniq.map(&:name) unless taxons.empty?
+      result[:stock] = total_on_hand
       result
     end
 
