@@ -57,6 +57,7 @@ module Spree
         indexes :taxon_names, type: 'keyword', index: 'not_analyzed'
         indexes :properties, type: 'keyword', index: 'not_analyzed'
         indexes :stock, type: 'integer', index: 'not_analyzed'
+        indexes :backorderable, type: 'bool', index: 'not_analyzed'
       end
     end
 
@@ -81,6 +82,7 @@ module Spree
       result[:taxon_ids] = taxons.map(&:self_and_ancestors).flatten.uniq.map(&:id) unless taxons.empty?
       result[:taxon_names] = taxons.map(&:self_and_ancestors).flatten.uniq.map(&:name) unless taxons.empty?
       result[:stock] = total_on_hand
+      result[:backorderable] = master.try(:is_backorderable?)
       result
     end
 
