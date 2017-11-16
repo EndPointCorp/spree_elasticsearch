@@ -2,7 +2,7 @@ module Spree
   Product.class_eval do
 
     include Elasticsearch::Model
-    include Elasticsearch::Model::Callbacks
+    # include Elasticsearch::Model::Callbacks
 
     Elasticsearch::Client.new host: ENV['ELASTICSEARCH_URL']
 
