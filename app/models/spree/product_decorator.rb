@@ -9,8 +9,27 @@ module Spree
     # after_save    { logger.debug ["Updating document... ", __elasticsearch__.index_document ].join }
     # after_destroy { logger.debug ["Deleting document... ", __elasticsearch__.delete_document].join }
 
-    #after_save    { Indexer.perform_async(:index,  self.id) }
+    #after_save    { Indexer.perform_async(:index,  self.id);  }
     #after_destroy { Indexer.perform_async(:delete, self.id) }
+
+
+    after_save :update_product_index
+    after_destroy :delete_product_index
+
+    def update_product_index
+      begin
+        Indexer.perform_async(:index, variant.product.id)
+      rescue
+
+      end
+    end
+
+    def delete_product_index
+      begin
+        Indexer.perform_async(:delete, variant.product.id)
+      rescue
+      end
+    end
 
     index_name "spree_#{Rails.env}"
     document_type 'spree_product'
