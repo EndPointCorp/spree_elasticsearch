@@ -2,7 +2,7 @@ module Spree
   Product.class_eval do
 
     include Elasticsearch::Model
-    # include Elasticsearch::Model::Callbacks
+    include Elasticsearch::Model::Callbacks
 
     Elasticsearch::Client.new host: ENV['ELASTICSEARCH_URL']
 
@@ -13,8 +13,8 @@ module Spree
     #after_destroy { Indexer.perform_async(:delete, self.id) }
 
 
-    after_save :update_product_index
-    after_destroy :delete_product_index
+    # after_save :update_product_index
+    # after_destroy :delete_product_index
 
     def update_product_index
       begin
