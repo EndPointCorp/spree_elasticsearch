@@ -76,7 +76,7 @@ module Spree
         indexes :taxon_names, type: 'keyword', index: 'not_analyzed'
         indexes :properties, type: 'keyword', index: 'not_analyzed'
         indexes :stock, type: 'integer', index: 'not_analyzed'
-        indexes :backorderable, type: 'bool', index: 'not_analyzed'
+        indexes :backorderable, type: 'integer', index: 'not_analyzed'
       end
     end
 
